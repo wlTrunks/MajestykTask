@@ -4,7 +4,9 @@ import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import com.majestykapps.arch.domain.repository.TasksRepository
+import com.majestykapps.arch.domain.usecase.GetTask
 import com.majestykapps.arch.domain.usecase.SubscribeTasks
+import com.majestykapps.arch.presentation.taskdetail.TaskDetailViewModel
 import com.majestykapps.arch.presentation.tasks.TasksViewModel
 
 class ViewModelFactory private constructor(
@@ -16,6 +18,9 @@ class ViewModelFactory private constructor(
         when {
             isAssignableFrom(TasksViewModel::class.java) -> {
                 TasksViewModel(SubscribeTasks(tasksRepository))
+            }
+            isAssignableFrom(TaskDetailViewModel::class.java) -> {
+                TaskDetailViewModel(GetTask(tasksRepository))
             }
             else -> throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
         }

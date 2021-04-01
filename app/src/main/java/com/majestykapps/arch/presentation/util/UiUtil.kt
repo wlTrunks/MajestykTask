@@ -40,3 +40,7 @@ internal class BindingDelegate<B : ViewBinding>(
     override fun getValue(thisRef: Fragment, property: KProperty<*>): B =
         binding ?: bindingProvider(thisRef.requireView()).apply { binding = this }
 }
+
+internal fun View.visibleIf(show: Boolean) {
+    visibility = if (show) View.VISIBLE else View.GONE
+}

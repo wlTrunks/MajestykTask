@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Observer
+import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.RecyclerView
@@ -25,13 +26,12 @@ class TasksFragment : Fragment(R.layout.fragment_tasks) {
 
     private val taskAdapter by lazy {
         TaskAdapter {
-            //todo navigate to task details
+            findNavController().navigate(TasksFragmentDirections.taskFragmentToTaskDetailsFragment(it.id))
         }
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         setupView()
     }
 

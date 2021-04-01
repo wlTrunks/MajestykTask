@@ -11,6 +11,7 @@ import com.majestykapps.arch.domain.usecase.GetTaskUseCase
 import com.majestykapps.arch.presentation.common.BaseViewModel
 import com.majestykapps.arch.util.SingleLiveEvent
 
+//todo ref this
 class TaskDetailViewModel(
     private val getTaskUseCase: GetTaskUseCase
 ) : BaseViewModel() {
@@ -29,8 +30,6 @@ class TaskDetailViewModel(
     }
 
     fun getTask(id: String, forceReload: Boolean = false) {
-        if (forceReload) getTaskUseCase
-
         val disposable = getTaskUseCase.getTask(id)
             .subscribe({ resource ->
                 when (resource) {
