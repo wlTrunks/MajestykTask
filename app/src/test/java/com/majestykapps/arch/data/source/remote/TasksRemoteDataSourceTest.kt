@@ -45,7 +45,7 @@ class TasksRemoteDataSourceTest {
 
     @Before
     fun setup() {
-        MockitoAnnotations.initMocks(this)
+        MockitoAnnotations.openMocks(this)
 
         dataSource = TasksRemoteDataSource.getInstance(api)
     }

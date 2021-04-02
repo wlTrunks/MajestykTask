@@ -17,6 +17,9 @@ import com.nhaarman.mockitokotlin2.whenever
 import io.reactivex.Completable
 import io.reactivex.Observable
 import io.reactivex.Observer
+import io.reactivex.observers.TestObserver
+import io.reactivex.plugins.RxJavaPlugins
+import io.reactivex.schedulers.TestScheduler
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -29,6 +32,7 @@ import org.mockito.Captor
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
+import java.util.concurrent.TimeUnit
 
 class TasksRepositoryTest {
 
@@ -48,6 +52,7 @@ class TasksRepositoryTest {
      * Runs RxJava synchronously
      */
     private val schedulerProvider = TestSchedulerProvider()
+    private val testScheduler = TestScheduler()
 
     /**
      * Receives emissions from [TasksRepositoryImpl.tasksSubject]
@@ -62,8 +67,9 @@ class TasksRepositoryTest {
     @Before
     fun setup() {
         // Allows us to use @Mock annotations
-        MockitoAnnotations.initMocks(this)
+        MockitoAnnotations.openMocks(this)
 
+        RxJavaPlugins.setComputationSchedulerHandler { testScheduler }
         repository = TasksRepositoryImpl.getInstance(
             localDataSource,
             remoteDataSource,
@@ -78,6 +84,7 @@ class TasksRepositoryTest {
         // Ensures inline Kotlin mocks do not leak
         Mockito.framework().clearInlineMocks()
         TasksRepositoryImpl.destroy()
+        RxJavaPlugins.reset()
     }
 
     @Test
@@ -112,9 +119,9 @@ class TasksRepositoryTest {
             isCacheDirty = false
             cachedTasks["a"] = task
         }
-
+        whenever(remoteDataSource.getTasks()).thenReturn(Observable.never<Resource<List<Task>>>())
         repository.loadTasks()
-
+        delay()
         verify(tasksObserver, times(1)).onNext(resourceDataCaptor.capture())
         assertTrue(resourceDataCaptor.value is Resource.Success)
         assertEquals(ArrayList(repository.cachedTasks.values), resourceDataCaptor.value.data)
@@ -137,7 +144,7 @@ class TasksRepositoryTest {
         whenever(remoteDataSource.getTasks()).thenReturn(Observable.just(resource))
 
         repository.loadTasks()
-
+        delay()
         verify(tasksObserver, times(1)).onNext(resource)
     }
 
@@ -148,7 +155,7 @@ class TasksRepositoryTest {
         whenever(localDataSource.getTasks()).thenReturn(Observable.just(resource))
 
         repository.loadTasks()
-
+        delay()
         verify(tasksObserver, times(1)).onNext(resource)
     }
 
@@ -157,10 +164,10 @@ class TasksRepositoryTest {
         repository.isCacheDirty = false
         val resource: Resource<List<Task>> = mock()
         whenever(localDataSource.getTasks()).thenReturn(Observable.just(resource))
-
+        whenever(remoteDataSource.getTasks()).thenReturn(Observable.just(resource))
         repository.loadTasks()
-
-        verify(tasksObserver, times(1)).onNext(resource)
+        delay()
+        verify(tasksObserver, times(2)).onNext(resource)
     }
 
     @Test
@@ -174,7 +181,7 @@ class TasksRepositoryTest {
         whenever(remoteDataSource.getTasks()).thenReturn(Observable.just(resource))
 
         repository.loadTasks()
-
+        delay()
         assertEquals(repository.cachedTasks["a"], task)
     }
 
@@ -186,7 +193,7 @@ class TasksRepositoryTest {
         whenever(remoteDataSource.getTasks()).thenReturn(Observable.just(resource))
 
         repository.loadTasks()
-
+        delay()
         verify(localDataSource, times(1)).saveTasks(data)
     }
 
@@ -199,7 +206,7 @@ class TasksRepositoryTest {
         whenever(remoteDataSource.getTasks()).thenReturn(Observable.just(resource))
 
         repository.loadTasks()
-
+        delay()
         assertFalse(repository.isCacheDirty)
     }
 
@@ -212,9 +219,114 @@ class TasksRepositoryTest {
         val data = listOf(task)
         val resource = Resource.Success(data)
         whenever(localDataSource.getTasks()).thenReturn(Observable.just(resource))
-
+        whenever(remoteDataSource.getTasks()).thenReturn(Observable.just(resource))
         repository.loadTasks()
-
+        delay()
         assertEquals(repository.cachedTasks["a"], task)
+    }
+
+    @Test
+    fun `get task by id local and remote cached filled`() {
+        val task = mock<Task> {
+            on { id } doReturn "a"
+        }
+        val resource = Resource.Success(task)
+        whenever(localDataSource.getTask("a")).thenReturn(Observable.just(resource))
+        whenever(remoteDataSource.getTask("a")).thenReturn(Observable.just(resource))
+        assert(repository.cachedTasks.isEmpty())
+        val testObserver = TestObserver<Resource<Task>>()
+        val observe = repository.getTask("a")
+        observe.subscribe(testObserver)
+        delay()
+        testObserver.assertValues(resource, resource)
+            .assertSubscribed()
+            .assertNoErrors()
+            .assertValueCount(2)
+        assert(repository.cachedTasks.isNotEmpty())
+        assertEquals(repository.cachedTasks["a"], task)
+    }
+
+    @Test
+    fun `get task by id local and cache empty`() {
+        val task = mock<Task> {
+            on { id } doReturn "a"
+        }
+        val resource = Resource.Success(task)
+        whenever(localDataSource.getTask("a")).thenReturn(Observable.never<Resource<Task>>())
+        whenever(remoteDataSource.getTask("a")).thenReturn(Observable.just(resource))
+        assert(repository.cachedTasks.isEmpty())
+        val testObserver = TestObserver<Resource<Task>>()
+        val observe = repository.getTask("a")
+        observe.subscribe(testObserver)
+        delay()
+        testObserver.assertValues(resource)
+            .assertSubscribed()
+            .assertNoErrors()
+            .assertValueCount(1)
+        verify(localDataSource, times(1)).saveTask(task)
+        assert(repository.cachedTasks.isNotEmpty())
+        assertEquals(repository.cachedTasks["a"], task)
+    }
+
+    @Test
+    fun `get task by id remote error local empty`() {
+        whenever(localDataSource.getTask("a")).thenReturn(Observable.never<Resource<Task>>())
+        whenever(remoteDataSource.getTask("a")).thenReturn(Observable.error(RuntimeException()))
+        val testObserver = TestObserver<Resource<Task>>()
+        val observe = repository.getTask("a")
+        observe.subscribe(testObserver)
+        delay()
+        testObserver
+            .assertSubscribed()
+            .assertNoValues()
+            .assertEmpty()
+            .assertNotTerminated()
+    }
+
+    @Test
+    fun `get task by id remote error local has data`() {
+        val task = mock<Task> {
+            on { id } doReturn "a"
+        }
+        val resource = Resource.Success(task)
+        whenever(localDataSource.getTask("a")).thenReturn(Observable.just(resource))
+        whenever(remoteDataSource.getTask("a")).thenReturn(Observable.error(RuntimeException()))
+        val testObserver = TestObserver<Resource<Task>>()
+        val observe = repository.getTask("a")
+        observe.subscribe(testObserver)
+        delay()
+        testObserver
+            .assertValueCount(1)
+            .assertError(RuntimeException::class.java)
+            .assertSubscribed()
+            .assertTerminated()
+    }
+
+    @Test
+    fun `get task by id from cache`() {
+        val task = Task("a", "test", "task")
+        repository.apply {
+            isCacheDirty = false
+            cachedTasks["a"] = task
+        }
+        val resource = Resource.Success(task)
+        val testObserver = TestObserver<Resource<Task>>()
+        whenever(remoteDataSource.getTask("a")).thenReturn(Observable.just(resource))
+        val observe = repository.getTask("a")
+        observe.subscribe(testObserver)
+        delay()
+        testObserver
+            .assertValueCount(2)
+            .assertValueAt(0) { it.data == task }
+            .assertValueAt(1) { it.data == task }
+            .assertSubscribed()
+            .assertNoErrors()
+            .assertComplete()
+        verify(localDataSource, times(0)).getTask("a")
+        verify(localDataSource, times(1)).saveTask(task)
+    }
+
+    private fun delay() {
+        testScheduler.advanceTimeBy(150, TimeUnit.MILLISECONDS)
     }
 }

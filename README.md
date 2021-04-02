@@ -19,3 +19,7 @@ So for the first taks:
 
 ## Allow tasks to be opened via deep link
  -add deep link feature
+
+## Write unit test
+ -ref some tests to a new feature
+ -add new tests

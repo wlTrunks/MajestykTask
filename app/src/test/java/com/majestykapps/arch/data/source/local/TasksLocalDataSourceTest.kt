@@ -8,9 +8,9 @@ import com.nhaarman.mockitokotlin2.mock
 import com.nhaarman.mockitokotlin2.times
 import com.nhaarman.mockitokotlin2.verify
 import com.nhaarman.mockitokotlin2.whenever
-import io.reactivex.Maybe
 import io.reactivex.Observable
 import io.reactivex.Observer
+import io.reactivex.Single
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -41,7 +41,7 @@ class TasksLocalDataSourceTest {
 
     @Before
     fun setup() {
-        MockitoAnnotations.initMocks(this)
+        MockitoAnnotations.openMocks(this)
     }
 
     @After
@@ -70,7 +70,7 @@ class TasksLocalDataSourceTest {
         val task = mock<Task> {
             on { id } doReturn taskId
         }
-        whenever(dao.getTaskById(taskId)).thenReturn(Maybe.just(task))
+        whenever(dao.getTaskById(taskId)).thenReturn(Single.just(task))
 
         val observer: Observer<Resource<Task>> = mock()
         dataSource.getTask(taskId).subscribe(observer)
