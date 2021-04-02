@@ -39,6 +39,7 @@ class TasksRepositoryImpl private constructor(
     @VisibleForTesting
     var tasksSubject: Subject<Resource<List<Task>>> = BehaviorSubject.create()
     private var disposableLoad: Disposable? = null
+    private var disposableSearch: Disposable? = null
 
     /**
      * Map of cached tasks using their id as the key
@@ -103,6 +104,20 @@ class TasksRepositoryImpl private constructor(
                 Observable.error(error)
             })
         return Observable.mergeDelayError(listRequest).subscribeOn(schedulerProvider.io)
+    }
+
+    override fun searchTask(text: String) {
+        val observer = if (cachedTasks.isNotEmpty()) Observable.just(cachedTasks.values)
+        else getAndCacheLocalTasks().map { it.data }
+        disposableSearch?.dispose()
+        disposableSearch = observer
+            .map { list ->
+                list.filter {
+                    it.title.startsWith(text, true) // add any specific constraint to search
+                            || it.description.startsWith(text, true)
+                }
+            }.subscribeOn(schedulerProvider.io)
+            .subscribe { tasksSubject.onNext(Resource.Success(it)) }
     }
 
     override fun refresh() {

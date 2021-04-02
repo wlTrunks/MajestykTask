@@ -25,4 +25,9 @@ interface TasksRepository : Repository {
      * Returns an [Observable] that will emit the resource when the backing data changes
      */
     fun getTask(id: String): Observable<Resource<Task>>
+
+    /**
+     * Search task by text
+     */
+    fun searchTask(text: String)
 }

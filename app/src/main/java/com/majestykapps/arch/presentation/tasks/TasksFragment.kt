@@ -1,6 +1,8 @@
 package com.majestykapps.arch.presentation.tasks
 
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -18,8 +20,11 @@ import com.majestykapps.arch.databinding.FragmentTasksBinding
 import com.majestykapps.arch.databinding.ItemTaskBinding
 import com.majestykapps.arch.domain.entity.Task
 import com.majestykapps.arch.presentation.util.bindingDelegate
+import com.majestykapps.arch.presentation.util.showKeyboard
 import com.majestykapps.arch.presentation.util.showSnack
+import com.majestykapps.arch.presentation.util.visibleIf
 import timber.log.Timber
+import java.util.*
 
 class TasksFragment : Fragment(R.layout.fragment_tasks) {
 
@@ -65,6 +70,27 @@ class TasksFragment : Fragment(R.layout.fragment_tasks) {
                 adapter = taskAdapter
                 addItemDecoration(DividerItemDecoration(requireContext(), DividerItemDecoration.VERTICAL))
             }
+            //simple approach
+            searchET.addTextChangedListener(
+                object : TextWatcher {
+                    private var timer: Timer? = null
+                    override fun afterTextChanged(s: Editable?) {
+                        timer = Timer()
+                        timer?.schedule(object : TimerTask() {
+                            override fun run() {
+                                viewModel.searchTask(s?.toString() ?: "")
+                            }
+                        }, 600)
+                    }
+
+                    override fun beforeTextChanged(text: CharSequence?, start: Int, count: Int, after: Int) {
+                    }
+
+                    override fun onTextChanged(text: CharSequence?, start: Int, before: Int, count: Int) {
+                        timer?.cancel()
+                    }
+                }
+            )
         }
     }
 
@@ -106,6 +132,14 @@ class TasksFragment : Fragment(R.layout.fragment_tasks) {
         }
     }
 
+    fun showSearchView() {
+        with(binding) {
+            appBarLayout.setExpanded(true, true)
+            searchET.requestFocus()
+            searchET.showKeyboard()
+        }
+    }
+
     companion object {
         private const val TAG = "TasksFragment"
 
@@ -125,7 +159,7 @@ private class TaskAdapter(private val listener: (Task) -> Unit) : RecyclerView.A
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
-        holder.bind(listItems[holder.adapterPosition])
+        holder.bind(listItems[holder.absoluteAdapterPosition])
     }
 
     override fun getItemCount(): Int = listItems.size

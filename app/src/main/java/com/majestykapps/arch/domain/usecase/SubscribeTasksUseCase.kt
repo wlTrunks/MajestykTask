@@ -24,6 +24,8 @@ interface SubscribeTasksUseCase {
      * Triggers a repository load that emits only fresh results; no cache
      */
     fun refresh()
+
+    fun search(text: String)
 }
 
 class SubscribeTasks(private val repository: TasksRepository) : SubscribeTasksUseCase {
@@ -36,5 +38,9 @@ class SubscribeTasks(private val repository: TasksRepository) : SubscribeTasksUs
     override fun refresh() = repository.run {
         refresh()
         loadTasks()
+    }
+
+    override fun search(text: String) {
+        repository.searchTask(text)
     }
 }

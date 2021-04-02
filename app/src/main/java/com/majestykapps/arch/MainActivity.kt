@@ -8,11 +8,13 @@ import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.findNavController
+import androidx.navigation.fragment.NavHostFragment
 import com.majestykapps.arch.data.repository.TasksRepositoryImpl
 import com.majestykapps.arch.data.source.local.TasksLocalDataSource
 import com.majestykapps.arch.data.source.local.ToDoDatabase
 import com.majestykapps.arch.databinding.ActivityMainBinding
 import com.majestykapps.arch.presentation.common.ViewModelFactory
+import com.majestykapps.arch.presentation.tasks.TasksFragment
 import com.majestykapps.arch.presentation.tasks.TasksViewModel
 import com.majestykapps.arch.presentation.util.visibleIf
 
@@ -43,6 +45,11 @@ class MainActivity : AppCompatActivity() {
                         searchIV.visibleIf(destination.id == R.id.taskFragment)
                         backIV.visibleIf(destination.id == R.id.taskDetailsFragment)
                     }
+            }
+            searchIV.setOnClickListener {
+                val tasksFragment = (supportFragmentManager.findFragmentById(R.id.nav_host_fragment) as NavHostFragment)
+                    .childFragmentManager.primaryNavigationFragment
+                if (tasksFragment is TasksFragment) tasksFragment.showSearchView()
             }
         }
     }

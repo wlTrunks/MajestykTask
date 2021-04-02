@@ -124,4 +124,16 @@ class TasksViewModelTest {
 
         verify(observer, times(1)).onChanged(false)
     }
+
+    @Test
+    fun `search task`() {
+        val tasks = listOf(Task("id"))
+        val res = Resource.Success(tasks)
+        val tasksObserver: Observer<List<Task>> = mock()
+        viewModel.tasks.observeForever(tasksObserver)
+        viewModel.tasksObserver.onNext(res)
+        viewModel.searchTask("id")
+        verify(useCase, times(1)).search("id")
+        verify(tasksObserver, times(1)).onChanged(tasks)
+    }
 }

@@ -326,6 +326,49 @@ class TasksRepositoryTest {
         verify(localDataSource, times(1)).saveTask(task)
     }
 
+    @Test
+    fun `search task from db`() {
+        val task1 = Task("1", "test")
+        val tasks = listOf(task1, Task("2", "some"))
+        val resource = Resource.Success(tasks)
+        whenever(localDataSource.getTasks()).thenReturn(Observable.just(resource))
+        val testObserver = TestObserver<Resource<List<Task>>>()
+        repository.searchTask("test")
+        verify(localDataSource, times(1)).getTasks()
+        repository.subscribe(testObserver)
+        testObserver.assertValueAt(0) { it.data?.get(0) == task1 }
+            .assertValueAt(0) { it.data!!.size == 1 }
+    }
+
+    @Test
+    fun `search task from cache`() {
+        val task1 = Task("1", "test")
+        val task2 = Task("2", "some")
+        repository.apply {
+            cachedTasks[task1.id!!] = task1
+            cachedTasks[task2.id!!] = task2
+        }
+        val testObserver = TestObserver<Resource<List<Task>>>()
+        repository.searchTask("test")
+        verify(localDataSource, times(0)).getTasks()
+        repository.subscribe(testObserver)
+        testObserver.assertValueAt(0) { it.data?.get(0) == task1 }
+            .assertValueAt(0) { it.data!!.size == 1 }
+    }
+
+    @Test
+    fun `search task failed`() {
+        val task1 = Task("1", "test")
+        val tasks = listOf(task1, Task("2", "some"))
+        val resource = Resource.Success(tasks)
+        whenever(localDataSource.getTasks()).thenReturn(Observable.just(resource))
+        val testObserver = TestObserver<Resource<List<Task>>>()
+        repository.searchTask("new")
+        verify(localDataSource, times(1)).getTasks()
+        repository.subscribe(testObserver)
+        testObserver.assertValueAt(0) { it.data!!.isEmpty() }
+    }
+
     private fun delay() {
         testScheduler.advanceTimeBy(150, TimeUnit.MILLISECONDS)
     }

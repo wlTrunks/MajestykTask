@@ -23,3 +23,9 @@ So for the first taks:
 ## Write unit test
  -ref some tests to a new feature
  -add new tests
+
+## Allow the user to search for tasks in the list screen
+ -add search task feature
+ -made a simple approach to delay search input
+ -add unit test
+

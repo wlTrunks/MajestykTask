@@ -1,6 +1,8 @@
 package com.majestykapps.arch.presentation.util
 
 import android.view.View
+import android.view.inputmethod.InputMethodManager
+import androidx.core.content.getSystemService
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleObserver
@@ -53,3 +55,15 @@ internal fun Fragment.showSnack(message: String?, block: () -> Unit): Snackbar {
     )
         .setAction("Reload") { block.invoke() }
 }
+
+/**
+ * Shows the on screen keyboard.
+ */
+internal fun View?.showKeyboard() {
+    this?.let {
+        if (it.requestFocus()) {
+            context.getSystemService<InputMethodManager>()?.showSoftInput(it, 0)
+        }
+    }
+}
+
