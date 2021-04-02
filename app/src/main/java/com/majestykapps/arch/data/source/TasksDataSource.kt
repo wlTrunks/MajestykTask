@@ -3,20 +3,20 @@ package com.majestykapps.arch.data.source
 import com.majestykapps.arch.data.common.Resource
 import com.majestykapps.arch.domain.entity.Task
 import io.reactivex.Completable
-import io.reactivex.Observable
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Main entry point for accessing tasks data.
  */
 interface TasksDataSource {
 
-    fun getTasks(): Observable<Resource<List<Task>>>
+    fun getTasks(): Flow<Resource<List<Task>>>
 
-    fun getTask(taskId: String): Observable<Resource<Task>>
+    fun getTask(taskId: String): Flow<Resource<Task>>
 
-    fun saveTask(task: Task): Completable
+    suspend fun saveTask(task: Task)
 
-    fun saveTasks(tasks: List<Task>): Completable
+    suspend fun saveTasks(tasks: List<Task>)
 
-    fun deleteTask(taskId: String): Completable
+    suspend fun deleteTask(taskId: String)
 }

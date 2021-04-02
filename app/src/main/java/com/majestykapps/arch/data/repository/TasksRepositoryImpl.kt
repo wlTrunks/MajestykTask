@@ -1,21 +1,32 @@
 package com.majestykapps.arch.data.repository
 
 import androidx.annotation.VisibleForTesting
-import com.majestykapps.arch.common.SchedulerProvider
-import com.majestykapps.arch.common.ToDoSchedulerProvider
 import com.majestykapps.arch.data.common.Resource
 import com.majestykapps.arch.data.source.TasksDataSource
 import com.majestykapps.arch.data.source.remote.TasksRemoteDataSource
+import com.majestykapps.arch.di.CoroutineDispatcherProvider
+import com.majestykapps.arch.di.CoroutineDispatcherProviderImpl
 import com.majestykapps.arch.domain.entity.Task
 import com.majestykapps.arch.domain.repository.TasksRepository
-import io.reactivex.Observable
 import io.reactivex.Observer
 import io.reactivex.disposables.Disposable
 import io.reactivex.plugins.RxJavaPlugins
 import io.reactivex.subjects.BehaviorSubject
 import io.reactivex.subjects.Subject
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapConcat
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import timber.log.Timber
-import java.util.concurrent.TimeUnit
+import javax.inject.Inject
+import javax.inject.Named
 
 /**
  * Concrete implementation to load tasks from the data sources into a cache.
@@ -24,10 +35,10 @@ import java.util.concurrent.TimeUnit
  * obtained from the server, by using the remote data source only if the local database doesn't
  * exist or is empty.
  */
-class TasksRepositoryImpl private constructor(
-    private val tasksLocalDataSource: TasksDataSource,
-    private val tasksRemoteDataSource: TasksDataSource,
-    private val schedulerProvider: SchedulerProvider
+class TasksRepositoryImpl @Inject constructor(
+    @Named("local") private val tasksLocalDataSource: TasksDataSource,
+    @Named("remote") private val tasksRemoteDataSource: TasksDataSource,
+    private val dispatcherProvider: CoroutineDispatcherProvider
 ) : TasksRepository {
 
     init {
@@ -57,67 +68,59 @@ class TasksRepositoryImpl private constructor(
         tasksSubject.subscribe(observer)
     }
 
-    override fun loadTasks() {
+    override fun loadTasks(): Flow<Resource<List<Task>>> {
         Timber.tag(TAG).i("loadTasks: isCacheDirty = $isCacheDirty")
-        val listRequest = mutableListOf<Observable<Resource<List<Task>>>>()
         // First check to see if there are cached tasks
-        if (!isCacheDirty && cachedTasks.isNotEmpty()) {
-            listRequest.add(Observable.just(Resource.Success(ArrayList(cachedTasks.values))))
-        } else {
-            listRequest.add(getAndCacheLocalTasks())
-        }
-        listRequest.add(getAndCacheRemoteTasks().delay(100, TimeUnit.MILLISECONDS)
-            .onErrorResumeNext { error: Throwable ->
-                tasksSubject.onNext(Resource.Failure(error))
-                Observable.error(error)
-            })
-        disposableLoad?.dispose()
-        disposableLoad = Observable.mergeDelayError(listRequest)
-            .subscribeOn(schedulerProvider.io)
-            .subscribe({
-                tasksSubject.onNext(it)
-            }, {
-                Timber.tag(TAG).e(it)
-                tasksSubject.onNext(Resource.Failure(it))
-            })
-    }
-
-    override fun getTask(id: String): Observable<Resource<Task>> {
-        Timber.tag(TAG).i("getTask: id = $id, isCacheDirty = $isCacheDirty")
-        val listRequest = mutableListOf<Observable<Resource<Task>>>()
-        if (!isCacheDirty && cachedTasks.isNotEmpty() && cachedTasks.containsKey(id)) {
-            listRequest.add(Observable.just(Resource.Success(cachedTasks[id])))
-        } else {
-            listRequest.add(tasksLocalDataSource.getTask(id).doOnNext {
-                it.data?.let { cache(it) }
-            })
-        }
-        listRequest.add(tasksRemoteDataSource.getTask(id)
-            .delay(100, TimeUnit.MILLISECONDS)
-            .doOnNext {
-                it.data?.let {
-                    cache(it)
-                    tasksLocalDataSource.saveTask(it)
-                }
+        return flow {
+            if (!isCacheDirty && cachedTasks.isNotEmpty()) {
+                emit(Resource.Success(ArrayList(cachedTasks.values)))
+            } else {
+                emit(getAndCacheLocalTasks().first())
             }
-            .onErrorResumeNext { error: Throwable ->
-                Observable.error(error)
-            })
-        return Observable.mergeDelayError(listRequest).subscribeOn(schedulerProvider.io)
+            emit(getAndCacheRemoteTasks()
+                .onStart { delay(100) }
+                .catch { error: Throwable ->
+                    flowOf(error)
+                }.first()
+            )
+        }.flowOn(dispatcherProvider.io)
     }
 
-    override fun searchTask(text: String) {
-        val observer = if (cachedTasks.isNotEmpty()) Observable.just(cachedTasks.values)
-        else getAndCacheLocalTasks().map { it.data }
-        disposableSearch?.dispose()
-        disposableSearch = observer
-            .map { list ->
-                list.filter {
+    override fun getTask(id: String): Flow<Resource<Task>> {
+        Timber.tag(TAG).i("getTask: id = $id, isCacheDirty = $isCacheDirty")
+        return flow {
+            if (!isCacheDirty && cachedTasks.isNotEmpty() && cachedTasks.containsKey(id)) {
+                emit(Resource.Success(cachedTasks[id]))
+            } else {
+                emit(tasksLocalDataSource.getTask(id).onEach {
+                    it.data?.let { cache(it) }
+                }.first())
+            }
+            emit(tasksRemoteDataSource.getTask(id)
+                .onStart { delay(100) }
+                .onEach {
+                    it.data?.let {
+                        cache(it)
+                        tasksLocalDataSource.saveTask(it)
+                    }
+                }
+                .catch { flowOf(it) }.first()
+            )
+        }.flowOn(dispatcherProvider.io)
+    }
+
+    override fun searchTask(text: String): Flow<Resource<List<Task>>> {
+        return flow {
+            if (cachedTasks.isNotEmpty()) emit(Resource.Success(cachedTasks.values.toList()))
+            else emit(getAndCacheLocalTasks().first())
+        }.map {
+            Resource.Success(
+                it.data!!.filter {
                     it.title.startsWith(text, true) // add any specific constraint to search
                             || it.description.startsWith(text, true)
-                }
-            }.subscribeOn(schedulerProvider.io)
-            .subscribe { tasksSubject.onNext(Resource.Success(it)) }
+                })
+        }
+            .flowOn(dispatcherProvider.io)
     }
 
     override fun refresh() {
@@ -126,9 +129,9 @@ class TasksRepositoryImpl private constructor(
         isCacheDirty = true
     }
 
-    private fun getAndCacheRemoteTasks(): Observable<Resource<List<Task>>> =
+    private fun getAndCacheRemoteTasks(): Flow<Resource<List<Task>>> =
         tasksRemoteDataSource.getTasks()
-            .doOnNext { resource ->
+            .onEach { resource ->
                 Timber.tag(TAG).d("getAndCacheRemoteTasks: emitted $resource")
                 resource.data?.let { tasks ->
                     cache(tasks)
@@ -137,9 +140,9 @@ class TasksRepositoryImpl private constructor(
                 }
             }
 
-    private fun getAndCacheLocalTasks(): Observable<Resource<List<Task>>> =
+    private fun getAndCacheLocalTasks(): Flow<Resource<List<Task>>> =
         tasksLocalDataSource.getTasks()
-            .doOnNext { resource ->
+            .onEach { resource ->
                 Timber.tag(TAG).d("getAndCacheLocalTasks: emitted $resource")
                 resource.data?.let { cache(it) }
             }
@@ -159,13 +162,10 @@ class TasksRepositoryImpl private constructor(
         }
     }
 
-    private fun saveToDb(tasks: List<Task>?) {
+    private suspend fun saveToDb(tasks: List<Task>?) {
         Timber.tag(TAG).d("saveToDb: $tasks")
         tasks?.let {
             tasksLocalDataSource.saveTasks(it)
-                .subscribeOn(schedulerProvider.io)
-                .observeOn(schedulerProvider.main)
-                .subscribe()
         }
     }
 
@@ -177,7 +177,7 @@ class TasksRepositoryImpl private constructor(
         fun getInstance(
             tasksLocalDataSource: TasksDataSource,
             tasksRemoteDataSource: TasksDataSource = TasksRemoteDataSource.getInstance(),
-            schedulerProvider: SchedulerProvider = ToDoSchedulerProvider()
+            schedulerProvider: CoroutineDispatcherProvider = CoroutineDispatcherProviderImpl()
         ): TasksRepositoryImpl = INSTANCE ?: synchronized(this) {
             INSTANCE ?: TasksRepositoryImpl(
                 tasksLocalDataSource,

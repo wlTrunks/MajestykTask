@@ -126,15 +126,17 @@ class TasksFragment : Fragment(R.layout.fragment_tasks) {
 
                 errorEvent.observe(viewLifecycleOwner, Observer { throwable ->
                     Timber.tag(TAG).e(throwable)
-                    showSnack(throwable.message) { viewModel.refresh() }.apply {
+                    showSnack(throwable?.message) { viewModel.refresh() }.apply {
                         snackbar = this
                         show()
                     }
                 })
 
                 tasks.observe(viewLifecycleOwner, Observer { tasks ->
-                    showEmptyList(tasks.isEmpty())
-                    taskAdapter.setData(tasks)
+                    showEmptyList(tasks.isNullOrEmpty())
+                    tasks?.let {
+                        taskAdapter.setData(tasks)
+                    }
                 })
             }
         }
