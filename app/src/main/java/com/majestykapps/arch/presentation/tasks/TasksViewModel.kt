@@ -77,9 +77,6 @@ class TasksViewModel(
     //make it simple
     fun searchTask(text: String) {
         subscribeTasksUseCase.search(text)
-        _tasks.value?.filter { it.title.startsWith(text, true) || it.description.startsWith(text, true) }?.let {
-            _tasks.postValue(it)
-        }
     }
 
     companion object {
