@@ -11,12 +11,14 @@ import com.majestykapps.arch.data.common.Resource.Success
 import com.majestykapps.arch.domain.entity.Task
 import com.majestykapps.arch.domain.usecase.SubscribeTasksUseCase
 import com.majestykapps.arch.presentation.common.BaseViewModel
+import com.majestykapps.arch.presentation.util.NetworkConnectionLiveData
 import com.majestykapps.arch.util.SingleLiveEvent
 import io.reactivex.Observer
 import io.reactivex.disposables.Disposable
 import timber.log.Timber
 
 class TasksViewModel(
+    ld: NetworkConnectionLiveData,
     private val subscribeTasksUseCase: SubscribeTasksUseCase
 ) : BaseViewModel() {
 
@@ -26,6 +28,8 @@ class TasksViewModel(
 
     private val _tasks = MutableLiveData<List<Task>>()
     val tasks: LiveData<List<Task>> get() = _tasks.distinctUntilChanged()
+
+    val networkConnectionLiveData: LiveData<Boolean> = ld.provideLiveData().distinctUntilChanged()
 
     @VisibleForTesting
     val tasksObserver = object : Observer<Resource<List<Task>>> {

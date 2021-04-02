@@ -1,10 +1,13 @@
 package com.majestykapps.arch.presentation.tasks
 
 import androidx.arch.core.executor.testing.InstantTaskExecutorRule
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Observer
 import com.majestykapps.arch.data.common.Resource
 import com.majestykapps.arch.domain.entity.Task
 import com.majestykapps.arch.domain.usecase.SubscribeTasksUseCase
+import com.majestykapps.arch.presentation.util.NetworkConnectionLiveData
 import com.nhaarman.mockitokotlin2.any
 import com.nhaarman.mockitokotlin2.mock
 import com.nhaarman.mockitokotlin2.times
@@ -31,7 +34,11 @@ class TasksViewModelTest {
     fun setup() {
         MockitoAnnotations.openMocks(this)
 
-        viewModel = TasksViewModel(useCase)
+        viewModel = TasksViewModel(object : NetworkConnectionLiveData {
+            override fun provideLiveData(): LiveData<Boolean> {
+                return MutableLiveData(false)
+            }
+        }, useCase)
     }
 
     @After

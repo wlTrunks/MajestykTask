@@ -94,6 +94,13 @@ class TasksFragment : Fragment(R.layout.fragment_tasks) {
         }
     }
 
+    private fun showEmptyList(show: Boolean) {
+        with(binding) {
+            infoContainer.visibleIf(show)
+            listRV.visibleIf(!show)
+        }
+    }
+
     override fun onPause() {
         super.onPause()
         binding.swipeRefresh.isEnabled = false
@@ -126,6 +133,7 @@ class TasksFragment : Fragment(R.layout.fragment_tasks) {
                 })
 
                 tasks.observe(viewLifecycleOwner, Observer { tasks ->
+                    showEmptyList(tasks.isEmpty())
                     taskAdapter.setData(tasks)
                 })
             }

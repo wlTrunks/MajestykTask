@@ -29,3 +29,6 @@ So for the first taks:
  -made a simple approach to delay search input
  -add unit test
 
+## Show empty view when tasks are empty; prompt users check network connection
+ -add on lost connections alert dialog
+ -add empty view

@@ -8,8 +8,10 @@ import com.majestykapps.arch.domain.usecase.GetTask
 import com.majestykapps.arch.domain.usecase.SubscribeTasks
 import com.majestykapps.arch.presentation.taskdetail.TaskDetailViewModel
 import com.majestykapps.arch.presentation.tasks.TasksViewModel
+import com.majestykapps.arch.presentation.util.NetworkConnectionLiveData
 
 class ViewModelFactory private constructor(
+    private val ld: NetworkConnectionLiveData,
     private val tasksRepository: TasksRepository
 ) : ViewModelProvider.Factory {
 
@@ -17,7 +19,7 @@ class ViewModelFactory private constructor(
     override fun <T : ViewModel?> create(modelClass: Class<T>) = with(modelClass) {
         when {
             isAssignableFrom(TasksViewModel::class.java) -> {
-                TasksViewModel(SubscribeTasks(tasksRepository))
+                TasksViewModel(ld, SubscribeTasks(tasksRepository))
             }
             isAssignableFrom(TaskDetailViewModel::class.java) -> {
                 TaskDetailViewModel(GetTask(tasksRepository))
@@ -30,9 +32,9 @@ class ViewModelFactory private constructor(
         @Volatile
         private var INSTANCE: ViewModelFactory? = null
 
-        fun getInstance(tasksRepository: TasksRepository) =
+        fun getInstance(tasksRepository: TasksRepository, ld: NetworkConnectionLiveData) =
             INSTANCE ?: synchronized(this) {
-                INSTANCE ?: ViewModelFactory(tasksRepository).also { INSTANCE = it }
+                INSTANCE ?: ViewModelFactory(ld, tasksRepository).also { INSTANCE = it }
             }
 
         @VisibleForTesting

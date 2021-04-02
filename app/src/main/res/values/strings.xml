@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">Majestyk Arch</string>
     <string name="toolbar_title">Majestyk Tasks</string>
+    <string name="empty_tasks_list">You have no tasks</string>
+    <string name="no_network">No network connection. Go to settings?</string>
+    <string name="search_task_hint">Search Task</string>
 </resources>
