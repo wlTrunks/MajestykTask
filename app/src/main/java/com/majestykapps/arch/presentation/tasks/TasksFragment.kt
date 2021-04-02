@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.Observer
@@ -38,6 +39,21 @@ class TasksFragment : Fragment(R.layout.fragment_tasks) {
         super.onViewCreated(view, savedInstanceState)
         setupView()
         initViewModelObservers()
+        proceedDeepLink()
+    }
+
+    private fun proceedDeepLink() {
+        requireActivity().intent.data?.let {
+            requireView().postDelayed({
+                requireActivity().intent.data = null
+                if (!it.lastPathSegment.isNullOrEmpty())
+                    findNavController().navigate(TasksFragmentDirections.taskFragmentToTaskDetailsFragment(it.lastPathSegment))
+                else {
+                    Toast.makeText(requireContext(), "Deep link id error ${it.lastPathSegment}", Toast.LENGTH_SHORT)
+                        .show()
+                }
+            }, 500)
+        }
     }
 
     private fun setupView() {

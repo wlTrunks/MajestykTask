@@ -16,3 +16,6 @@ So for the first taks:
  -refactored TasksRepositoryImpl getTasks and getTask method
  -add global RxJavaPlugins errorHandler
  -add snackbar show on network response error
+
+## Allow tasks to be opened via deep link
+ -add deep link feature
