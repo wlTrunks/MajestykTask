@@ -4,7 +4,6 @@ import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.Transformations
 import com.majestykapps.arch.data.common.Resource.Failure
-import com.majestykapps.arch.data.common.Resource.Loading
 import com.majestykapps.arch.data.common.Resource.Success
 import com.majestykapps.arch.domain.entity.Task
 import com.majestykapps.arch.domain.usecase.GetTaskUseCase
@@ -16,7 +15,7 @@ class TaskDetailViewModel(
     private val getTaskUseCase: GetTaskUseCase
 ) : BaseViewModel() {
 
-    val loadingEvent = SingleLiveEvent<Void>()
+    val loadingEvent = SingleLiveEvent<Boolean>()
     val errorEvent = SingleLiveEvent<Throwable>()
 
     private val task = MutableLiveData<Task>()
@@ -29,16 +28,16 @@ class TaskDetailViewModel(
         MutableLiveData<String>(it.description)
     }
 
-    fun getTask(id: String, forceReload: Boolean = false) {
+    fun getTask(id: String) {
         val disposable = getTaskUseCase.getTask(id)
+            .doOnSubscribe { loadingEvent.postValue(true) }
             .subscribe({ resource ->
                 when (resource) {
-                    is Loading -> loadingEvent.call()
-                    is Failure -> errorEvent.value = resource.error
-                    is Success -> task.value = resource.data
+                    is Failure -> errorEvent.postValue(resource.error)
+                    is Success -> task.postValue(resource.data)
                 }
             }, { throwable ->
-                errorEvent.value = throwable
+                errorEvent.postValue(throwable)
             })
         disposables.add(disposable)
     }

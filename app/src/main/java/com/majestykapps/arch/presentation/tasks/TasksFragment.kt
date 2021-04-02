@@ -1,7 +1,6 @@
 package com.majestykapps.arch.presentation.tasks
 
 import android.os.Bundle
-import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,17 +11,22 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.snackbar.Snackbar
 import com.majestykapps.arch.R
 import com.majestykapps.arch.databinding.FragmentTasksBinding
 import com.majestykapps.arch.databinding.ItemTaskBinding
 import com.majestykapps.arch.domain.entity.Task
 import com.majestykapps.arch.presentation.util.bindingDelegate
+import com.majestykapps.arch.presentation.util.showSnack
+import timber.log.Timber
 
 class TasksFragment : Fragment(R.layout.fragment_tasks) {
 
     private val binding by bindingDelegate(FragmentTasksBinding::bind)
 
     private val viewModel: TasksViewModel by activityViewModels()
+
+    private var snackbar: Snackbar? = null
 
     private val taskAdapter by lazy {
         TaskAdapter {
@@ -33,6 +37,7 @@ class TasksFragment : Fragment(R.layout.fragment_tasks) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         setupView()
+        initViewModelObservers()
     }
 
     private fun setupView() {
@@ -40,7 +45,6 @@ class TasksFragment : Fragment(R.layout.fragment_tasks) {
             swipeRefresh.setOnRefreshListener {
                 viewModel.refresh()
             }
-
             listRV.apply {
                 adapter = taskAdapter
                 addItemDecoration(DividerItemDecoration(requireContext(), DividerItemDecoration.VERTICAL))
@@ -48,24 +52,35 @@ class TasksFragment : Fragment(R.layout.fragment_tasks) {
         }
     }
 
-    override fun onActivityCreated(savedInstanceState: Bundle?) {
-        super.onActivityCreated(savedInstanceState)
+    override fun onPause() {
+        super.onPause()
+        binding.swipeRefresh.isEnabled = false
+    }
 
-        initViewModelObservers()
+    override fun onResume() {
+        super.onResume()
+        binding.swipeRefresh.isEnabled = true
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        snackbar?.dismiss()
+        snackbar = null
     }
 
     private fun initViewModelObservers() {
         with(binding) {
             viewModel.apply {
                 loadingEvent.observe(viewLifecycleOwner, Observer { isRefreshing ->
-                    Log.d(TAG, "loadingEvent observed")
                     swipeRefresh.isRefreshing = isRefreshing
                 })
 
                 errorEvent.observe(viewLifecycleOwner, Observer { throwable ->
-                    Log.e(TAG, "errorEvent observed", throwable)
-                    text.text = throwable.localizedMessage
-                    // TODO show error
+                    Timber.tag(TAG).e(throwable)
+                    showSnack(throwable.message) { viewModel.refresh() }.apply {
+                        snackbar = this
+                        show()
+                    }
                 })
 
                 tasks.observe(viewLifecycleOwner, Observer { tasks ->

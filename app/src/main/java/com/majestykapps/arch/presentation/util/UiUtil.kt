@@ -7,6 +7,7 @@ import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.OnLifecycleEvent
 import androidx.lifecycle.observe
 import androidx.viewbinding.ViewBinding
+import com.google.android.material.snackbar.Snackbar
 import kotlin.properties.ReadOnlyProperty
 import kotlin.reflect.KProperty
 
@@ -43,4 +44,12 @@ internal class BindingDelegate<B : ViewBinding>(
 
 internal fun View.visibleIf(show: Boolean) {
     visibility = if (show) View.VISIBLE else View.GONE
+}
+
+internal fun Fragment.showSnack(message: String?, block: () -> Unit): Snackbar {
+    return Snackbar.make(
+        requireView(), message ?: "Response Error",
+        Snackbar.LENGTH_INDEFINITE
+    )
+        .setAction("Reload") { block.invoke() }
 }

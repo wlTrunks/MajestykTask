@@ -4,10 +4,12 @@ import android.os.Bundle
 import android.view.View
 import androidx.fragment.app.Fragment
 import androidx.navigation.fragment.navArgs
+import com.google.android.material.snackbar.Snackbar
 import com.majestykapps.arch.R
 import com.majestykapps.arch.databinding.FragmentTaskDetailsBinding
 import com.majestykapps.arch.initViewModel
 import com.majestykapps.arch.presentation.util.bindingDelegate
+import com.majestykapps.arch.presentation.util.showSnack
 import com.majestykapps.arch.presentation.util.visibleIf
 
 class TaskDetailsFragment : Fragment(R.layout.fragment_task_details) {
@@ -16,11 +18,23 @@ class TaskDetailsFragment : Fragment(R.layout.fragment_task_details) {
 
     private val viewModel: TaskDetailViewModel by lazy { requireActivity().initViewModel() }
 
+    private var snackbar: Snackbar? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        getTaskId()
+    }
+
+    private fun getTaskId() {
         navArgs<TaskDetailsFragmentArgs>().value.taskId?.let {
             viewModel.getTask(it)
         }
+    }
+
+    override fun onDestroyView() {
+        super.onDestroyView()
+        snackbar?.dismiss()
+        snackbar = null
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
@@ -31,7 +45,10 @@ class TaskDetailsFragment : Fragment(R.layout.fragment_task_details) {
             })
             errorEvent.observe(viewLifecycleOwner, {
                 binding.progressBar.visibleIf(false)
-                binding.descTV.text = it.localizedMessage
+                showSnack(it.message) { getTaskId() }.apply {
+                    snackbar = this
+                    show()
+                }
             })
             title.observe(viewLifecycleOwner, {
                 binding.progressBar.visibleIf(false)

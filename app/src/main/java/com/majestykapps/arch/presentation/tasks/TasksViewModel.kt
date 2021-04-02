@@ -3,6 +3,7 @@ package com.majestykapps.arch.presentation.tasks
 import androidx.annotation.VisibleForTesting
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.distinctUntilChanged
 import com.majestykapps.arch.data.common.Resource
 import com.majestykapps.arch.data.common.Resource.Failure
 import com.majestykapps.arch.data.common.Resource.Loading
@@ -24,7 +25,7 @@ class TasksViewModel(
     val launchEvent = SingleLiveEvent<String>()
 
     private val _tasks = MutableLiveData<List<Task>>()
-    val tasks: LiveData<List<Task>> get() = _tasks
+    val tasks: LiveData<List<Task>> get() = _tasks.distinctUntilChanged()
 
     @VisibleForTesting
     val tasksObserver = object : Observer<Resource<List<Task>>> {
@@ -36,27 +37,27 @@ class TasksViewModel(
             Timber.tag(TAG).d("tasksObserver onNext: resource = $resource")
             when (resource) {
                 is Loading -> {
-                    loadingEvent.value = true
+                    loadingEvent.postValue(true)
                 }
                 is Failure -> {
-                    loadingEvent.value = false
-                    errorEvent.value = resource.error
+                    loadingEvent.postValue(false)
+                    errorEvent.postValue(resource.error)
                 }
                 is Success -> {
-                    loadingEvent.value = false
-                    _tasks.value = resource.data
+                    loadingEvent.postValue(false)
+                    _tasks.postValue(resource.data)
                 }
             }
         }
 
         override fun onError(e: Throwable) {
             // Uncaught errors will land here
-            loadingEvent.value = false
-            errorEvent.value = e
+            loadingEvent.postValue(false)
+            errorEvent.postValue(e)
         }
 
         override fun onComplete() {
-            loadingEvent.value = false
+            loadingEvent.postValue(false)
         }
     }
 

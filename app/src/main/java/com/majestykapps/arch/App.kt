@@ -2,6 +2,8 @@ package com.majestykapps.arch
 
 import android.app.Application
 import android.os.StrictMode
+import timber.log.Timber
+import timber.log.Timber.DebugTree
 
 class App : Application() {
 
@@ -10,6 +12,7 @@ class App : Application() {
 
         if (BuildConfig.DEBUG) {
             initStrictMode()
+            Timber.plant(DebugTree())
         }
     }
 

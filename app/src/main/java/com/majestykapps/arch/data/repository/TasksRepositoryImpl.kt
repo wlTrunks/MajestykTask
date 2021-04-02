@@ -10,9 +10,12 @@ import com.majestykapps.arch.domain.entity.Task
 import com.majestykapps.arch.domain.repository.TasksRepository
 import io.reactivex.Observable
 import io.reactivex.Observer
+import io.reactivex.disposables.Disposable
+import io.reactivex.plugins.RxJavaPlugins
 import io.reactivex.subjects.BehaviorSubject
 import io.reactivex.subjects.Subject
 import timber.log.Timber
+import java.util.concurrent.TimeUnit
 
 /**
  * Concrete implementation to load tasks from the data sources into a cache.
@@ -27,8 +30,15 @@ class TasksRepositoryImpl private constructor(
     private val schedulerProvider: SchedulerProvider
 ) : TasksRepository {
 
+    init {
+        RxJavaPlugins.setErrorHandler { e ->
+            Timber.tag(TAG).e(e)
+        }
+    }
+
     @VisibleForTesting
     var tasksSubject: Subject<Resource<List<Task>>> = BehaviorSubject.create()
+    private var disposableLoad: Disposable? = null
 
     /**
      * Map of cached tasks using their id as the key
@@ -48,43 +58,51 @@ class TasksRepositoryImpl private constructor(
 
     override fun loadTasks() {
         Timber.tag(TAG).i("loadTasks: isCacheDirty = $isCacheDirty")
+        val listRequest = mutableListOf<Observable<Resource<List<Task>>>>()
         // First check to see if there are cached tasks
         if (!isCacheDirty && cachedTasks.isNotEmpty()) {
-            tasksSubject.onNext(Resource.Success(ArrayList(cachedTasks.values)))
-            return
-        }
-
-        val observable = if (isCacheDirty) {
-            // Try remote data source with fallback to local
-            getAndCacheRemoteTasks().onErrorResumeNext(getAndCacheLocalTasks())
+            listRequest.add(Observable.just(Resource.Success(ArrayList(cachedTasks.values))))
         } else {
-            // Try local data source
-            getAndCacheLocalTasks()
+            listRequest.add(getAndCacheLocalTasks())
         }
-
-        observable
+        listRequest.add(getAndCacheRemoteTasks().delay(100, TimeUnit.MILLISECONDS)
+            .onErrorResumeNext { error: Throwable ->
+                tasksSubject.onNext(Resource.Failure(error))
+                Observable.error(error)
+            })
+        disposableLoad?.dispose()
+        disposableLoad = Observable.mergeDelayError(listRequest)
             .subscribeOn(schedulerProvider.io)
-            .observeOn(schedulerProvider.main)
-            .subscribe(tasksSubject)
+            .subscribe({
+                tasksSubject.onNext(it)
+            }, {
+                Timber.tag(TAG).e(it)
+                tasksSubject.onNext(Resource.Failure(it))
+            })
     }
 
     override fun getTask(id: String): Observable<Resource<Task>> {
         Timber.tag(TAG).i("getTask: id = $id, isCacheDirty = $isCacheDirty")
+        val listRequest = mutableListOf<Observable<Resource<Task>>>()
         if (!isCacheDirty && cachedTasks.isNotEmpty() && cachedTasks.containsKey(id)) {
-            return Observable.just(Resource.Success(cachedTasks[id]))
-        }
-
-        val observable = if (isCacheDirty) {
-            tasksRemoteDataSource.getTask(id)
-                .onErrorResumeNext(tasksLocalDataSource.getTask(id))
+            listRequest.add(Observable.just(Resource.Success(cachedTasks[id])))
         } else {
-            tasksLocalDataSource.getTask(id)
-                .onErrorResumeNext(tasksRemoteDataSource.getTask(id))
+            listRequest.add(tasksLocalDataSource.getTask(id).doOnNext {
+                it.data?.let { cache(it) }
+            })
         }
-
-        return observable
-            .subscribeOn(schedulerProvider.io)
-            .observeOn(schedulerProvider.main)
+        listRequest.add(tasksRemoteDataSource.getTask(id)
+            .delay(100, TimeUnit.MILLISECONDS)
+            .doOnNext {
+                it.data?.let {
+                    cache(it)
+                    tasksLocalDataSource.saveTask(it)
+                }
+            }
+            .onErrorResumeNext { error: Throwable ->
+                Observable.error(error)
+            })
+        return Observable.mergeDelayError(listRequest).subscribeOn(schedulerProvider.io)
     }
 
     override fun refresh() {
