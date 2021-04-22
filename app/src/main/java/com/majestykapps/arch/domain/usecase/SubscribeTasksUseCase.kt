@@ -4,6 +4,8 @@ import com.majestykapps.arch.data.common.Resource
 import com.majestykapps.arch.domain.entity.Task
 import com.majestykapps.arch.domain.repository.TasksRepository
 import io.reactivex.Observer
+import kotlinx.coroutines.flow.Flow
+import javax.inject.Inject
 
 /**
  * Due to the simplicity of this example, this use case is somewhat redundant. Typically you'd
@@ -18,29 +20,31 @@ interface SubscribeTasksUseCase {
     /**
      * Triggers a repository load that may emit cached results
      */
-    fun load()
+    suspend fun load(): Flow<Resource<List<Task>>>
 
     /**
      * Triggers a repository load that emits only fresh results; no cache
      */
-    fun refresh()
+    suspend fun refresh()
 
-    fun search(text: String)
+    fun search(text: String): Flow<Resource<List<Task>>>
 }
 
-class SubscribeTasks(private val repository: TasksRepository) : SubscribeTasksUseCase {
+class SubscribeTasks @Inject constructor(private val repository: TasksRepository) : SubscribeTasksUseCase {
 
     override fun subscribe(observer: Observer<Resource<List<Task>>>) =
         repository.subscribe(observer)
 
-    override fun load() = repository.loadTasks()
+    override suspend fun load(): Flow<Resource<List<Task>>> = repository.loadTasks()
 
-    override fun refresh() = repository.run {
-        refresh()
-        loadTasks()
+    override suspend fun refresh() {
+        repository.run {
+            refresh()
+            loadTasks()
+        }
     }
 
-    override fun search(text: String) {
-        repository.searchTask(text)
+    override fun search(text: String): Flow<Resource<List<Task>>> {
+       return repository.searchTask(text)
     }
 }

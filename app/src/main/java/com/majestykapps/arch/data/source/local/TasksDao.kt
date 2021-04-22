@@ -6,9 +6,7 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import com.majestykapps.arch.domain.entity.Task
-import io.reactivex.Completable
-import io.reactivex.Observable
-import io.reactivex.Single
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Data Access Object for the tasks table.
@@ -16,13 +14,13 @@ import io.reactivex.Single
  * Using abstract class (instead of interface) to allow for @Transaction functions
  */
 @Dao
-abstract class TasksDao {
+interface TasksDao {
 
     /**
      * Select all tasks from the tasks table.
      */
     @Query("SELECT * FROM Tasks")
-    abstract fun getTasks(): Observable<List<Task>>
+    fun getTasks(): Flow<List<Task>>
 
     /**
      * Select a task by id.
@@ -30,16 +28,16 @@ abstract class TasksDao {
      * @param taskId the task id.
      */
     @Query("SELECT * FROM Tasks WHERE id = :taskId")
-    abstract fun getTaskById(taskId: String): Single<Task>
+    fun getTaskById(taskId: String): Flow<Task>
 
     /**
      * Insert a task in the database. If the task already exists, replace it.
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    abstract fun insertTask(task: Task): Completable
+    suspend fun insertTask(task: Task)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    abstract fun insertTaskSync(task: Task)
+    suspend fun insertTaskSync(task: Task)
 
     /**
      * Delete a task by id.
@@ -47,13 +45,13 @@ abstract class TasksDao {
      * @param taskId the task id.
      */
     @Query("DELETE FROM Tasks WHERE id = :taskId")
-    abstract fun deleteTaskById(taskId: String): Completable
+    suspend fun deleteTaskById(taskId: String)
 
     /**
      * Bulk insert in a transaction
      */
     @Transaction
-    open fun insertTasks(tasks: List<Task>) {
+    suspend fun insertTasks(tasks: List<Task>) {
         tasks.forEach { insertTaskSync(it) }
     }
 }

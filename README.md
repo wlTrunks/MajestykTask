@@ -32,3 +32,8 @@ So for the first taks:
 ## Show empty view when tasks are empty; prompt users check network connection
  -add on lost connections alert dialog
  -add empty view
+
+## Ref to coroutines, add DI
+ -add dagger
+ -migrate to coroutines
+ well needed rewrite unit test, change livedata to MVI and stateflow example on TaskDetailViewModel

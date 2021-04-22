@@ -1,44 +1,51 @@
 package com.majestykapps.arch.presentation.taskdetail
 
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.Transformations
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.majestykapps.arch.data.common.Resource.Failure
 import com.majestykapps.arch.data.common.Resource.Success
 import com.majestykapps.arch.domain.entity.Task
 import com.majestykapps.arch.domain.usecase.GetTaskUseCase
-import com.majestykapps.arch.presentation.common.BaseViewModel
-import com.majestykapps.arch.util.SingleLiveEvent
+import com.majestykapps.arch.presentation.common.Error
+import com.majestykapps.arch.presentation.common.Loading
+import com.majestykapps.arch.presentation.common.ViewEvent
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.onStart
+import kotlinx.coroutines.flow.receiveAsFlow
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-//todo ref this
-class TaskDetailViewModel(
+class TaskDetailViewModel @Inject constructor(
     private val getTaskUseCase: GetTaskUseCase
-) : BaseViewModel() {
+) : ViewModel() {
 
-    val loadingEvent = SingleLiveEvent<Boolean>()
-    val errorEvent = SingleLiveEvent<Throwable>()
-
-    private val task = MutableLiveData<Task>()
-
-    val title: LiveData<String> = Transformations.switchMap(task) {
-        MutableLiveData<String>(it.title)
-    }
-
-    val description: LiveData<String> = Transformations.switchMap(task) {
-        MutableLiveData<String>(it.description)
-    }
+    private val _state = MutableStateFlow(TaskDetailState())
+    val state = _state.asStateFlow()
+    private val viewEventsChannel = Channel<ViewEvent?>(1)
+    val viewEvents = viewEventsChannel.receiveAsFlow()
 
     fun getTask(id: String) {
-        val disposable = getTaskUseCase.getTask(id)
-            .doOnSubscribe { loadingEvent.postValue(true) }
-            .subscribe({ resource ->
-                when (resource) {
-                    is Failure -> errorEvent.postValue(resource.error)
-                    is Success -> task.postValue(resource.data)
+        viewModelScope.launch {
+            getTaskUseCase.getTask(id).onStart {
+                viewEventsChannel.offer(Loading)
+            }
+                .catch {
+                    viewEventsChannel.offer(Error(it))
+                }.collect { resource ->
+                    println("TASK resource $resource")
+                    when (resource) {
+                        is Failure -> viewEventsChannel.offer(Error(resource.error))
+                        is Success -> _state.value = TaskDetailState(resource.data)
+                    }
                 }
-            }, { throwable ->
-                errorEvent.postValue(throwable)
-            })
-        disposables.add(disposable)
+        }
     }
 }
+
+data class TaskDetailState(
+    val task: Task? = null
+)

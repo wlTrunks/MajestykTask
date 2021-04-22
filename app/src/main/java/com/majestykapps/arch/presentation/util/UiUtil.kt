@@ -74,7 +74,7 @@ internal fun View?.showKeyboard() {
     }
 }
 
-class NetworkConnectionChecker @RequiresPermission(android.Manifest.permission.ACCESS_NETWORK_STATE)
+internal class NetworkConnectionChecker @RequiresPermission(android.Manifest.permission.ACCESS_NETWORK_STATE)
 constructor(
     private val context: Context
 ) : LiveData<Boolean>() {
@@ -107,8 +107,4 @@ constructor(
         connectivityManager.unregisterNetworkCallback(networkCallback)
         super.onInactive()
     }
-}
-
-interface NetworkConnectionLiveData {
-    fun provideLiveData(): LiveData<Boolean>
 }

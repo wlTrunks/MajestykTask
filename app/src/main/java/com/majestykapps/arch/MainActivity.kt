@@ -3,34 +3,38 @@ package com.majestykapps.arch
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.fragment.app.FragmentActivity
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.navigation.findNavController
 import androidx.navigation.fragment.NavHostFragment
-import com.majestykapps.arch.data.repository.TasksRepositoryImpl
-import com.majestykapps.arch.data.source.local.TasksLocalDataSource
-import com.majestykapps.arch.data.source.local.ToDoDatabase
 import com.majestykapps.arch.databinding.ActivityMainBinding
-import com.majestykapps.arch.presentation.common.ViewModelFactory
 import com.majestykapps.arch.presentation.tasks.TasksFragment
 import com.majestykapps.arch.presentation.tasks.TasksViewModel
-import com.majestykapps.arch.presentation.util.NetworkConnectionChecker
-import com.majestykapps.arch.presentation.util.NetworkConnectionLiveData
 import com.majestykapps.arch.presentation.util.visibleIf
+import dagger.android.AndroidInjection
+import dagger.android.AndroidInjector
+import dagger.android.DispatchingAndroidInjector
+import dagger.android.HasAndroidInjector
+import javax.inject.Inject
 
-class MainActivity : AppCompatActivity() {
+class MainActivity : AppCompatActivity(), HasAndroidInjector {
 
-    private lateinit var tasksViewModel: TasksViewModel
+    private val tasksViewModel: TasksViewModel by viewModels { viewModelFactory }
+
+    @Inject
+    lateinit var dispatchingAndroidInjector: DispatchingAndroidInjector<Any>
+
+    @Inject
+    lateinit var viewModelFactory: ViewModelProvider.Factory
+
+    override fun androidInjector(): AndroidInjector<Any> = dispatchingAndroidInjector
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        AndroidInjection.inject(this)
         super.onCreate(savedInstanceState)
-
         setupView()
-        tasksViewModel = initViewModel()
         initViewModelObservers()
     }
 
@@ -75,14 +79,4 @@ class MainActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "MainActivity"
     }
-}
-
-inline fun <reified VM : ViewModel> FragmentActivity.initViewModel(): VM {
-    val tasksDao = ToDoDatabase.getInstance(applicationContext).taskDao()
-    val localDataSource = TasksLocalDataSource.getInstance(tasksDao)
-    val tasksRepository = TasksRepositoryImpl.getInstance(localDataSource)
-    val factory = ViewModelFactory.getInstance(tasksRepository, object : NetworkConnectionLiveData {
-        override fun provideLiveData(): LiveData<Boolean> = NetworkConnectionChecker(applicationContext)
-    })
-    return ViewModelProvider(this, factory).get(VM::class.java)
 }
